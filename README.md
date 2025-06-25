@@ -41,7 +41,7 @@ DISCORD_WEBHOOK_URL=your_discord_webhook_url_here
 DISCORD_AVATAR_URL=https://example.com/path/to/avatar.png
 ```
 
-### Example Customization Process
+## Example Customization Process
 ```python
 def scrape_specific_company_jobs(soup):
     job_links = []
