@@ -8,16 +8,29 @@ from bs4 import BeautifulSoup
 import time
 import os
 import json
+import requests
+from dotenv import load_dotenv
+from urllib.parse import urlparse
+from pathlib import Path
+
+load_dotenv(Path(__file__).parent/'.env')
+
+JSON_FILE_PATH = './job_listings/flare.json'
+CONFIG = {
+    'FLARE_CAREER_PAGE': os.getenv('FLARE_CAREER_PAGE'),
+    'DISCORD_WEBHOOK': os.getenv('DISCORD_WEBHOOK_URL'),
+    'DISCORD_AVATAR': os.getenv('DISCORD_AVATAR_URL', '')
+}
+
 
 logging.basicConfig(
     level=logging.WARNING,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-
 def setup_driver():
     chrome_options = Options()
-    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--window-size=1920,1080")
@@ -31,16 +44,23 @@ def setup_driver():
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
+def validate_url(url):
+    try:
+        result = urlparse(url)
+        return all([result.scheme, result.netloc])
+    except:
+        return False
 
 def scrape_with_selenium():
     driver = None
     try:
-        logging.info("Setting up Chrome driver...")
         driver = setup_driver()
+        
+        if not validate_url(CONFIG['FLARE_CAREER_PAGE']):
+            raise ValueError(f"Invalid URL: CONFIG['FLARE_CAREER_PAGE']")
 
-        url = 'https://flare.io/company/careers/'
+        url=str(CONFIG['FLARE_CAREER_PAGE'])
         driver.get(url)
-        logging.info("Waiting for JavaScript to load...")
         time.sleep(20)
 
         final_html = driver.page_source
@@ -51,13 +71,10 @@ def scrape_with_selenium():
             '.job-listing',
         ]
 
-        found_jobs = False
         for selector in job_selectors:
             elements = soup.select(selector)
             if elements:
-                found_jobs = True
-                if elements:
-                    text = elements[0].get_text(strip=True)[:100]
+                text = elements[0].get_text(strip=True)[:100]
 
         all_links = soup.find_all('a', href=True)
         job_links = []
@@ -67,22 +84,29 @@ def scrape_with_selenium():
             if any(keyword in href.lower() or keyword in text.lower() for keyword in ['job', 'career', 'position', 'apply']):
                 job_links.append((text, href))
 
-        json_file_path = './job_listings/flare.json'
+        
         current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         job_data = []
-        if os.path.exists(json_file_path) and os.path.getsize(json_file_path) > 0:
+        if os.path.exists(JSON_FILE_PATH) and os.path.getsize(JSON_FILE_PATH) > 0:
             try:
-                with open(json_file_path, 'r') as file:
+                with open(JSON_FILE_PATH, 'r') as file:
                     job_data = json.load(file)
             except json.JSONDecodeError:
                 logging.warning("Existing JSON file was corrupted, starting fresh")
-
+        
+        
+                 
         if job_links:
             job_links_dict = {
                 text: href for text, href in job_links
                 if text.lower() not in ['careers', 'apply'] and text.strip()
             }
+            
+            new_jobs = compare_jobs(job_data, job_links_dict)
+        
+            if new_jobs:
+                send_discord_notification(new_jobs)
 
             today_entry = {
                 "date": current_date,
@@ -90,7 +114,7 @@ def scrape_with_selenium():
             }
             job_data.append(today_entry)
 
-        with open(json_file_path, 'w') as file:
+        with open(JSON_FILE_PATH, 'w') as file:
             json.dump(job_data, file, indent=4)
 
         return final_html
@@ -102,10 +126,47 @@ def scrape_with_selenium():
         if driver:
             driver.quit()
 
+def send_discord_notification(new_jobs):
+    if not new_jobs:
+        return
+    
+    message = "🚀 **New Job Postings Detected!**\n\n"
+    for job_title, job_url in new_jobs.items():
+        message += f"• [{job_title}]({job_url})\n"
+        
+    payload = {
+        "content": message,
+        "username": "Job Announcer"
+        ""
+    }
+    
+    try:
+        response = requests.post(CONFIG['DISCORD_WEBHOOK'], json=payload)
+        response.raise_for_status()
+        logging.info("Discord notification sent successfully")
+    except Exception as e:
+        logging.error(f"Failed to send Discord notification: {e}")
+        
+def compare_jobs(previous_jobs, current_jobs):
+    if not previous_jobs:
+        return current_jobs
+    
+    latest_previous_jobs = previous_jobs[-1]["jobs"] if previous_jobs else {}
+    
+    new_jobs = {
+        title: url for title, url in current_jobs.items()
+        if title not in latest_previous_jobs
+    }
+    
+    return new_jobs
 
 if __name__ == "__main__":
-    html_content = scrape_with_selenium()
-    if html_content:
-        logging.info("Scraping completed - job listings updated")
-    else:
-        logging.error("Scraping failed - no data collected")
+    try:
+        html_content = scrape_with_selenium()
+        if html_content:
+            logging.info("Scraping completed successfully!")
+        else:
+            logging.error("Scraping failed!")
+            
+    except Exception as e:
+        logging.error(f"Fatal error in main: {e}", exc_info=True)
