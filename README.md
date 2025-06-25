@@ -39,6 +39,7 @@ DISCORD_WEBHOOK_URL=your_discord_webhook_url_here
 
 # Optional variables
 DISCORD_AVATAR_URL=https://example.com/path/to/avatar.png
+```
 
 ### Example Customization Process
 ```python
@@ -57,3 +58,4 @@ def scrape_specific_company_jobs(soup):
             job_links.append((job_title.text, job_link['href']))
     
     return job_links
+```
