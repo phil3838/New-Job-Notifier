@@ -26,6 +26,20 @@ Each company's website has a unique HTML structure, class names, and page archit
 - URL parsing and link extraction
 - Specific keyword matching for job links
 
+## Environment Setup
+
+### 1. Create your `.env` file
+
+Create a new file named `.env` in the `scraper/` directory with the following contents:
+
+```ini
+# Required variables
+ANY_CAREER_PAGE=https://career.page/
+DISCORD_WEBHOOK_URL=your_discord_webhook_url_here
+
+# Optional variables
+DISCORD_AVATAR_URL=https://example.com/path/to/avatar.png
+
 ### Example Customization Process
 ```python
 def scrape_specific_company_jobs(soup):
