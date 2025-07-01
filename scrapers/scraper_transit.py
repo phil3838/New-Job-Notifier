@@ -97,7 +97,6 @@ def scrape_with_selenium():
         if job_links:
             job_links_dict = {
                 text: href for text, href in job_links
-                if text.lower() not in ['careers', 'apply'] and text.strip()
             }
             
             new_jobs = compare_jobs(job_data, job_links_dict)

@@ -15,13 +15,12 @@ from pathlib import Path
 
 load_dotenv(Path(__file__).parent/'.env')
 
-JSON_FILE_PATH = './job_listings/flare.json'
+JSON_FILE_PATH = './job_listings/botpress.json'  
 CONFIG = {
-    'FLARE_CAREER_PAGE': os.getenv('FLARE_CAREER_PAGE'),
+    'CAREER_PAGE_URL': os.getenv('BOTPRESS_CAREER_PAGE'),
     'DISCORD_WEBHOOK': os.getenv('DISCORD_WEBHOOK_URL'),
     'DISCORD_AVATAR': os.getenv('DISCORD_AVATAR_URL', '')
 }
-
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -56,35 +55,49 @@ def scrape_with_selenium():
     try:
         driver = setup_driver()
         
-        if not validate_url(CONFIG['FLARE_CAREER_PAGE']):
-            raise ValueError(f"Invalid URL: CONFIG['FLARE_CAREER_PAGE']")
+        if not validate_url(CONFIG['CAREER_PAGE_URL']):
+            raise ValueError(f"Invalid URL: {CONFIG['CAREER_PAGE_URL']}")
 
-        url=str(CONFIG['FLARE_CAREER_PAGE'])
+        url = str(CONFIG['CAREER_PAGE_URL'])
         driver.get(url)
-        time.sleep(20)
+        time.sleep(10)
 
         final_html = driver.page_source
         soup = BeautifulSoup(final_html, 'html.parser')
         
-        job_selectors = [
-            '.BambooHR-ATS-Jobs-Item',
-            '.job-listing',
-        ]
+        job_items = soup.select('li.whr-item')
 
-        for selector in job_selectors:
-            elements = soup.select(selector)
-            if elements:
-                text = elements[0].get_text(strip=True)[:100]
-
-        all_links = soup.find_all('a', href=True)
         job_links = []
-        for link in all_links:
-            href = link.get('href', '')
-            text = link.get_text(strip=True)
-            if any(keyword in href.lower() or keyword in text.lower() for keyword in ['job', 'career', 'position', 'apply']):
-                job_links.append((text, href))
-
-        
+        for item in job_items:
+            title_element = item.select_one('h3.whr-title a')
+            if not title_element:
+                continue
+            
+            job_title = title_element.get_text(strip=True)
+            job_url = title_element['href']
+            
+            location_element = item.select_one('li.whr-location')
+            location = location_element.get_text(strip=True).replace('Location:','').strip() if location_element else ""
+            
+            department = ""
+            prev_element = item.find_previous_sibling()
+            while prev_element:
+                if prev_element.name == 'h2' and 'whr-group' in prev_element.get('class', []):
+                    department = prev_element.get_text(strip=True)
+                    break
+                prev_element = prev_element.find_previous_sibling()
+            
+            
+            display_parts = []
+            if department:
+                display_parts.append(f"[{department}]")
+            display_parts.append(job_title)
+            if location:
+                display_parts.append(f"- {location}")
+            
+            display_text = " ".join(display_parts)
+            job_links.append((display_text, job_url))
+            
         current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         job_data = []
@@ -92,15 +105,12 @@ def scrape_with_selenium():
             try:
                 with open(JSON_FILE_PATH, 'r') as file:
                     job_data = json.load(file)
-            except json.JSONDecodeError:
+            except:
                 logging.warning("Existing JSON file was corrupted, starting fresh")
-        
-        
-                 
+                    
         if job_links:
             job_links_dict = {
                 text: href for text, href in job_links
-                if text.lower() not in ['careers', 'apply'] and text.strip()
             }
             
             new_jobs = compare_jobs(job_data, job_links_dict)
@@ -130,17 +140,14 @@ def send_discord_notification(new_jobs):
     if not new_jobs:
         return
     
-    message = "🚀 **New Job Postings Detected @ Flare**\n\n"
+    message = "🚀 **New Job Postings Detected @ Botpress**\n\n"
     for job_title, job_url in new_jobs.items():
-        if job_url.startswith('//'):
-            job_url = f"https:{job_url}"
-            
-            message += f"• [{job_title}]({job_url})\n"
-    
+        message += f"• [{job_title}]({job_url})\n"
+        
     payload = {
         "content": message,
-        "username": "Job Scraper Bot"
-        ""
+        "username": "Job Scraper Bot",
+        "avatar_url": CONFIG['DISCORD_AVATAR']
     }
     
     try:
