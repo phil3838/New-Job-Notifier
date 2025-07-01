@@ -28,7 +28,14 @@ Each company's website has a unique HTML structure, class names, and page archit
 
 ## Environment Setup
 
-### 1. Create your `.env` file
+### 1. Install module dependencies
+
+```ini
+pip install -r requirements.txt
+```
+
+
+### 2. Create your `.env` file
 
 Create a new file named `.env` in the `scraper/` directory with the following contents:
 
