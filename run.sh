@@ -1,5 +1,5 @@
 #!/bin/bash
 
-python3 scrapers/flare_scraper.py
-python3 scrapers/transit_scraper.py
-python3 scrapers/botpress_scraper.py
+python3 scrapers/scraper_flare.py
+python3 scrapers/scraper_transit.py
+python3 scrapers/scraper_botpress.py
