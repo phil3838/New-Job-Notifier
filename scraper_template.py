@@ -128,7 +128,6 @@ def scrape_with_selenium():
             driver.quit()
 
 def send_discord_notification(new_jobs):
-    """Send notification to Discord webhook"""
     if not new_jobs:
         return
     
@@ -151,7 +150,6 @@ def send_discord_notification(new_jobs):
         logging.error(f"Failed to send Discord notification: {e}")
         
 def compare_jobs(previous_jobs, current_jobs):
-    """Compare current jobs with previous jobs to find new ones"""
     if not previous_jobs:
         return current_jobs
     
