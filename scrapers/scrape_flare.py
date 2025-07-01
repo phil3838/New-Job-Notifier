@@ -130,10 +130,16 @@ def send_discord_notification(new_jobs):
     if not new_jobs:
         return
     
-    message = "🚀 **New Job Postings Detected!**\n\n"
+    message = """
+    **🚀 New Job Postings Detected @ Flare**
+    """
+    
     for job_title, job_url in new_jobs.items():
-        message += f"• [{job_title}]({job_url})\n"
-        
+        if job_url.startswith('//'):
+            job_url = f"https:{job_url}"
+            
+            message += f"• [*{job_title}*] - {job_url}\n"
+    
     payload = {
         "content": message,
         "username": "Job Announcer"
